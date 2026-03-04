@@ -1,0 +1,21 @@
+{
+  "name": "aiter-mla-nhead8",
+  "category": "feature",
+  "difficulty": "medium",
+  "source": {
+    "repo": "ROCm/aiter",
+    "fix_pr": 2138,
+    "base_branch": "main"
+  },
+  "description": "Add nhead=8 support for MLA decode via padding to nhead=16. The ASM kernel only supports nhead in {16,32,64,128}; enable nhead=8 by padding q/o tensors before the kernel call.",
+  "expected_loc_changed": 36,
+  "expected_files_changed": 2,
+  "affected_files": [
+    "aiter/mla.py",
+    "op_tests/test_mla.py"
+  ],
+  "requires_gpu": true,
+  "requires_model_download": false,
+  "estimated_agent_time_minutes": 30,
+  "tags": ["rocm", "mla", "attention", "kernel-wrapper", "aiter"]
+}

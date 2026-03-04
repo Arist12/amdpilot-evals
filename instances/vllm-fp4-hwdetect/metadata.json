@@ -1,0 +1,20 @@
+{
+  "name": "vllm-fp4-hwdetect",
+  "category": "bugfix",
+  "difficulty": "medium",
+  "source": {
+    "repo": "vllm-project/vllm",
+    "fix_pr": 34647,
+    "issue": 34641
+  },
+  "description": "Add hardware detection for FP4 BMM to prevent MI300X crashes. VLLM_ROCM_USE_AITER_FP4BMM defaults to True but MI300X (gfx942) doesn't support FP4.",
+  "expected_loc_changed": 39,
+  "expected_files_changed": 1,
+  "affected_files": [
+    "vllm/_aiter_ops.py"
+  ],
+  "requires_gpu": true,
+  "requires_model_download": true,
+  "estimated_agent_time_minutes": 45,
+  "tags": ["rocm", "fp4", "hardware-detection", "vllm", "mi300x"]
+}
