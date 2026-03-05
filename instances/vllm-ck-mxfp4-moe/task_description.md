@@ -1,8 +1,6 @@
-# Add CK Backend for MXFP4 MoE Quantization on ROCm
+# vLLM MXFP4 quantization lacks fused MoE support on ROCm
 
-## Problem
-
-vLLM's MXFP4 quantization (`mxfp4.py`) has no fused MoE support on ROCm. Models using MXFP4 quantization with MoE layers cannot run efficiently — they fall back to dense computation or fail entirely on AMD GPUs.
+vLLM's MXFP4 quantization layer has no fused MoE support on ROCm. Models using MXFP4 quantization with MoE layers fall back to dense per-expert computation, which is significantly slower. The MXFP4 quantization module needs a fused MoE backend for AMD GPUs using AITER's CK operators.
 
 ## Affected Files
 
@@ -11,7 +9,8 @@ vLLM's MXFP4 quantization (`mxfp4.py`) has no fused MoE support on ROCm. Models 
 
 ## Environment
 
-- Use `/opt/venv/bin/python3` for all commands
+- vLLM repo at `/workspace/vllm`
+- Use `/opt/venv/bin/python3`
 
 ## Verification
 

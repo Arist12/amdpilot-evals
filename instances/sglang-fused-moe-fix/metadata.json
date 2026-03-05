@@ -4,16 +4,11 @@
   "difficulty": "easy",
   "source": {
     "repo": "sgl-project/sglang",
-    "fix_pr": 19840,
-    "bug_pr": 19672,
+    "pr": 19840,
     "buggy_commit": "ee5ccde0ad9eefe96c2c29c9d7d9087d78a4500c"
   },
-  "description": "Fix NameError on ROCm in fused_moe: get_global_server_args imported only under CUDA guard but called unconditionally",
-  "expected_loc_changed": 3,
-  "expected_files_changed": 1,
-  "affected_file": "python/sglang/srt/layers/moe/fused_moe_triton/fused_moe.py",
-  "requires_gpu": true,
-  "requires_model_download": false,
-  "estimated_agent_time_minutes": 15,
-  "tags": ["rocm", "moe", "import-guard", "sglang"]
+  "description": "MoE models crash on ROCm with NameError in fused_moe.py",
+  "task_description_source": "Error message only (symptom), no fix hints",
+  "test_harness_type": "runtime (exec() catches NameError)",
+  "requires_gpu": true
 }

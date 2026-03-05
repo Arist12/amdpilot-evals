@@ -1,8 +1,6 @@
-# Enable Encoder Self-Attention on ROCm Attention Backends
+# vLLM ROCm attention backends fail on encoder self-attention
 
-## Problem
-
-vLLM's ROCm attention backends (`RocmAttentionImpl` and `RocmAiterUnifiedAttention`) raise `NotImplementedError` for encoder self-attention (`AttentionType.ENCODER` and `ENCODER_DECODER`). This blocks Whisper and other encoder-decoder models on AMD GPUs.
+vLLM's ROCm attention backends raise NotImplementedError when handling encoder self-attention. This blocks encoder-decoder models (e.g., Whisper) from running on AMD GPUs. The error occurs in the RocmAttention and RocmAiterUnifiedAttention backend classes.
 
 ## Affected Files
 
@@ -11,7 +9,8 @@ vLLM's ROCm attention backends (`RocmAttentionImpl` and `RocmAiterUnifiedAttenti
 
 ## Environment
 
-- Use `/opt/venv/bin/python3` for all commands
+- vLLM repo at `/workspace/vllm`
+- Use `/opt/venv/bin/python3`
 
 ## Verification
 

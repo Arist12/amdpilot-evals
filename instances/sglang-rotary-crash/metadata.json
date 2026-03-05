@@ -5,19 +5,12 @@
   "source": {
     "repo": "sgl-project/sglang",
     "pr": 18903,
-    "merge_commit": "5e3103a7872c645012ce316bc87da41a7cbaae52"
+    "issue": 18812,
+    "merge_commit": "5e3103a7872c645012ce316bc87da41a7cbaae52",
+    "parent_commit": "90a0d66e1e46f67ceba1c1c5061180e6af1cc748"
   },
-  "description": "[AMD] Fix RotaryEmbedding crash on AMD/ROCm (regression from #17934)",
-  "expected_loc_changed": 13,
-  "expected_files_changed": 1,
-  "affected_files": [
-    "python/sglang/srt/layers/rotary_embedding.py"
-  ],
-  "requires_gpu": true,
-  "requires_model_download": false,
-  "tags": [
-    "rocm",
-    "bugfix",
-    "sgl-project"
-  ]
+  "description": "RotaryEmbedding crashes on ROCm with CUDA_HOME error",
+  "task_description_source": "GitHub issue #18812 (symptom only, no fix)",
+  "test_harness_type": "runtime",
+  "requires_gpu": true
 }

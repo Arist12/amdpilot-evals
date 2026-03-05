@@ -1,24 +1,14 @@
 {
   "name": "vllm-ck-mxfp4-moe",
-  "category": "bugfix",
+  "category": "feature",
   "difficulty": "hard",
   "source": {
     "repo": "vllm-project/vllm",
     "pr": 34301,
-    "merge_commit": "d5b6f3ba362552d582f93c25958a6a612d28a700"
+    "parent_commit": "1a014a0a9327ed64a1bdec8e1afa43b9ea70a3c1"
   },
-  "description": "[ROCm][Quantization] Add Composable Kernel (CK) backend support for M\u2026",
-  "expected_loc_changed": 260,
-  "expected_files_changed": 2,
-  "affected_files": [
-    "vllm/_aiter_ops.py",
-    "vllm/model_executor/layers/quantization/mxfp4.py"
-  ],
-  "requires_gpu": true,
-  "requires_model_download": false,
-  "tags": [
-    "rocm",
-    "bugfix",
-    "vllm-project"
-  ]
+  "description": "MXFP4 quantization lacks fused MoE support on ROCm",
+  "task_description_source": "GitHub PR #34301 (symptom only, no fix)",
+  "test_harness_type": "runtime",
+  "requires_gpu": true
 }

@@ -1,26 +1,26 @@
-# Fix RotaryEmbedding Crash on AMD/ROCm
+# RotaryEmbedding fails on ROCm with CUDA_HOME error
 
-## Symptom
+ROCm CI fails during runtime initialization. On HIP, `RotaryEmbedding` dispatches through `MultiPlatformOp` and hits a fallback path that JIT-compiles with `cuda_files`. In ROCm-only environments, this triggers CUDA toolchain discovery and fails with:
 
-ALL models crash on ROCm with errors related to `tvm_ffi` JIT compilation or missing `nvidia-smi`/`CUDA_HOME`. The error occurs in the rotary embedding layer during model forward pass.
+```
+RuntimeError: Could not find CUDA installation. Please set CUDA_HOME environment variable.
+```
 
-A recent change (PR #17934) changed the HIP rotary embedding fallback from `sgl_kernel.rotary_embedding` to a path that uses `tvm_ffi` JIT compilation requiring NVIDIA tools, which are unavailable on AMD GPUs. Since `_is_cuda=False` on HIP, the code always routes through this broken JIT fallback path.
+This breaks ALL models on ROCm since every model uses rotary embeddings.
 
-## Affected Files
+Failing CI links:
+- 2-GPU accuracy
+- 1-GPU unit tests
+- VLM accuracy and performance
+
+## Affected File
 
 - `python/sglang/srt/layers/rotary_embedding.py`
 
-## Key Observations
-
-- The `RotaryEmbedding` class has subclasses with different `forward_native()` signatures (e.g., `MRotaryEmbedding`, `DeepseekScalingRotaryEmbedding`)
-- The HIP path needs to bypass the NVIDIA-specific JIT path and use pure PyTorch (`forward_native()`) instead
-- The fix must work for ALL RotaryEmbedding subclasses
-
 ## Environment
 
-- Repository: sgl-project/sglang
-- Docker container with ROCm, PyTorch, AMD GPU
-- Use `/opt/venv/bin/python3` for all commands
+- SGLang at `/workspace/sglang`
+- Use `/opt/venv/bin/python3`
 
 ## Verification
 

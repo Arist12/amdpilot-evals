@@ -1,20 +1,7 @@
-# sglang-fused-moe-fix: Fix NameError on ROCm in fused_moe.py
-#
-# Category: Bug Fix
-# Difficulty: Easy
-# Source: sgl-project/sglang PR #19840
-#
-# The agent must find and fix a conditional import bug where
-# get_global_server_args() is called on ROCm but only imported under CUDA guard.
-#
-# Usage:
-#   uv run amdpilot run path/to/amdpilot-evals/instances/sglang-fused-moe-fix/task.yaml
-
 name: sglang-fused-moe-fix
-type: fix
+type: bugfix
 repo: https://github.com/sgl-project/sglang.git
-repo_branch: main
-base_image: rocm/sgl-dev:v0.5.9-rocm720-mi35x-20260226
+base_image: amdpilot-eval-sglang-fused-moe-fix
 
 model_endpoint:
   model: "qwen-3.5"
@@ -22,54 +9,25 @@ model_endpoint:
   api_key: "sk-dummy"
 
 container:
-  name: amdpilot_eval_sglang
+  name: amdpilot_eval_moe
   gpu: "0"
   shm_size: 16g
   devices: [/dev/kfd, /dev/dri]
-  env:
-    TOKENIZERS_PARALLELISM: "false"
 
 workload:
-  description: "Fix NameError in sglang fused_moe.py on ROCm (get_global_server_args undefined)"
-  function: "fused_experts_impl()"
+  description: "MoE models crash on ROCm with NameError in fused_moe.py"
   framework: PyTorch
 
 benchmark:
-  command: "python3 /workspace/test_harness.py"
-  script: ""
+  command: "/opt/venv/bin/python3 /workspace/test_harness.py"
   metric_name: score
   metric_pattern: 'SCORE:\s+([\d.]+)'
   metric_direction: higher
 
 task:
-  description_file: task_description.md
+  description_file: evals/instances/sglang-fused-moe-fix/task_description.md
 
-stages:
-  - name: stage1_fix_bug
-    target_ms: 100
-    timeout_s: 1800
-    start_image: null
-    hints: |
-      Read the task description at /workspace/task_description.md.
-      The bug is in python/sglang/srt/layers/moe/fused_moe_triton/fused_moe.py.
-      Look for where get_global_server_args is imported vs where it's called.
-      On ROCm (_is_cuda=False), the import is skipped but the call is not.
-      After fixing, run: python3 /workspace/test_harness.py
+stages: auto
 
-kimi_cli:
-  repo_url: "https://github.com/Arist12/kimi-cli.git"
-  branch: amd-dev
-  install_dir: "/sgl-workspace/kimi-cli"
-  thinking: true
-  yolo: true
-  ralph_iterations: -1
-
-nudge_agent: oss
-supervisor_mode: agent
-max_retries_per_stage: 2
+max_retries_per_stage: 3
 max_total_hours: 1
-
-
-
-skills_dir: skills
-agent_config_dir: agent-config

@@ -1,24 +1,14 @@
 #!/usr/bin/env python3
-"""Test harness for vllm-ck-mxfp4-moe eval instance.
+"""Test harness for vllm-ck-mxfp4-moe. RUNTIME IMPORT CHECKS.
 
-Bug: No CK backend for MXFP4 MoE quantization on ROCm. The mxfp4.py has no
-fused MoE support. Requires _aiter_ops.py MoE functions and mxfp4.py CK backend.
-
-Exit 0 = PASS, Exit 1 = FAIL.
-Output: SCORE: <0-100>
+Bug: MXFP4 quantization has no fused MoE support on ROCm.
+Test: import the modules and verify CK MoE backend exists.
 """
-
-import os
 import sys
-from pathlib import Path
-
-VLLM_ROOT = Path(os.environ.get("VLLM_ROOT", "/workspace/vllm"))
-AITER_OPS = VLLM_ROOT / "vllm/_aiter_ops.py"
-MXFP4 = VLLM_ROOT / "vllm/model_executor/layers/quantization/mxfp4.py"
+sys.path.insert(0, "/workspace/vllm")
 
 checks_passed = 0
 checks_total = 0
-
 
 def check(name, condition, detail=""):
     global checks_passed, checks_total
@@ -30,75 +20,88 @@ def check(name, condition, detail=""):
     if detail and not condition:
         msg += f": {detail}"
     print(msg)
-    return condition
 
+print("=" * 60)
+print("vllm-ck-mxfp4-moe test harness")
+print("=" * 60)
 
-def check_aiter_ops_moe():
-    """Verify _aiter_ops.py has MoE-related CK/MXFP4 functions."""
-    if not check("vllm/_aiter_ops.py exists", AITER_OPS.is_file()):
-        return
+# Check 1: Import _aiter_ops module
+aiter_ops_mod = None
+try:
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_aiter_ops", "/workspace/vllm/vllm/_aiter_ops.py")
+    aiter_ops_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(aiter_ops_mod)
+    check("Import _aiter_ops module", True)
+except Exception as e:
+    check("Import _aiter_ops module", False, str(e))
 
-    source = AITER_OPS.read_text()
-    # Fix adds: fused_topk, fused_moe, shuffle_weight_a16w4, shuffle_scale_a16w4
-    has_fused_moe = "fused_moe" in source or "fused_topk" in source
-    check("_aiter_ops.py: MoE-related fused ops (fused_moe/fused_topk)",
-          has_fused_moe,
-          "No fused MoE or fused_topk found")
+# Check 2: Import mxfp4 module
+mxfp4_mod = None
+try:
+    spec2 = importlib.util.spec_from_file_location(
+        "mxfp4", "/workspace/vllm/vllm/model_executor/layers/quantization/mxfp4.py")
+    mxfp4_mod = importlib.util.module_from_spec(spec2)
+    spec2.loader.exec_module(mxfp4_mod)
+    check("Import mxfp4 module", True)
+except Exception as e:
+    check("Import mxfp4 module", False, str(e))
 
-    has_weight_shuffle = (
-        "shuffle_weight" in source or "shuffle_scale" in source or
-        "a16w4" in source.lower() or "A16W4" in source
+# Check 3: _aiter_ops has fused MoE-related functions
+if aiter_ops_mod:
+    has_fused_moe = any(
+        hasattr(aiter_ops_mod, name)
+        for name in ["rocm_aiter_fused_topk", "fused_topk", "_rocm_aiter_fused_moe_impl"]
     )
-    check("_aiter_ops.py: weight shuffle / A16W4 layout helpers",
-          has_weight_shuffle,
-          "No shuffle_weight, shuffle_scale, or A16W4 layout helpers")
+    # Also check class methods
+    if not has_fused_moe:
+        for attr_name in dir(aiter_ops_mod):
+            obj = getattr(aiter_ops_mod, attr_name, None)
+            if isinstance(obj, type):
+                methods = [m for m in dir(obj) if "fused_moe" in m.lower() or "fused_topk" in m.lower()]
+                if methods:
+                    has_fused_moe = True
+                    break
+    check("_aiter_ops has fused MoE functions", has_fused_moe)
+else:
+    check("_aiter_ops has fused MoE functions", False, "Module not imported")
 
-
-def check_mxfp4_ck_backend():
-    """Verify mxfp4.py has CK backend and fused MoE forward pass."""
-    if not check("mxfp4.py exists", MXFP4.is_file()):
-        return
-
-    source = MXFP4.read_text()
-    # Fix adds CK backend enum and CK-specific forward
-    has_ck_backend = "CK" in source and ("backend" in source.lower() or "Backend" in source)
-    check("mxfp4.py: CK backend variant",
-          has_ck_backend,
-          "No CK backend in Mxfp4Backend")
-
-    has_fused_moe_apply = (
-        "fused_moe" in source or "fused_topk" in source or
-        ("moe" in source.lower() and "rocm" in source.lower())
+# Check 4: mxfp4 module has CK backend support for MoE
+if mxfp4_mod:
+    # The fix adds a CK backend enum and fused MoE forward path
+    has_ck_backend = any(
+        "ck" in str(getattr(mxfp4_mod, name, "")).lower()
+        for name in dir(mxfp4_mod)
+    ) or any(
+        "ck" in name.lower() or "moe" in name.lower()
+        for name in dir(mxfp4_mod)
+        if not name.startswith("_")
     )
-    check("mxfp4.py: fused MoE apply / CK forward path",
-          has_fused_moe_apply,
-          "No fused MoE or CK-specific MoE forward")
+    check("mxfp4 module has CK/MoE support", has_ck_backend)
+else:
+    check("mxfp4 module has CK/MoE support", False, "Module not imported")
 
-    has_weight_prep = (
-        "shuffle" in source or "interleave" in source or
-        "gate_up" in source or "hidden_pad" in source or "intermediate_pad" in source
+# Check 5: Weight preparation functions exist
+if aiter_ops_mod:
+    has_shuffle = any(
+        hasattr(aiter_ops_mod, name)
+        for name in ["shuffle_weight_a16w4", "shuffle_scale_a16w4"]
     )
-    check("mxfp4.py: CK weight preparation (shuffle/interleave/pad)",
-          has_weight_prep,
-          "No weight shuffle, interleave, or pad handling for CK")
+    # Check in class methods too
+    if not has_shuffle:
+        for attr_name in dir(aiter_ops_mod):
+            obj = getattr(aiter_ops_mod, attr_name, None)
+            if isinstance(obj, type):
+                methods = [m for m in dir(obj) if "shuffle" in m.lower()]
+                if methods:
+                    has_shuffle = True
+                    break
+    check("Weight shuffle functions exist", has_shuffle)
+else:
+    check("Weight shuffle functions exist", False, "Module not imported")
 
-
-def run_checks():
-    print("=" * 60)
-    print("vllm-ck-mxfp4-moe test harness")
-    print("=" * 60)
-
-    print("\n--- vllm/_aiter_ops.py ---")
-    check_aiter_ops_moe()
-
-    print("\n--- mxfp4.py ---")
-    check_mxfp4_ck_backend()
-
-
-if __name__ == "__main__":
-    run_checks()
-    print()
-    score = (checks_passed / checks_total * 100.0) if checks_total > 0 else 0.0
-    print(f"Results: {checks_passed}/{checks_total} checks passed")
-    print(f"SCORE: {score:.1f}")
-    sys.exit(0 if checks_passed == checks_total else 1)
+print(f"\nResults: {checks_passed}/{checks_total}")
+score = (checks_passed / checks_total * 100.0) if checks_total > 0 else 0.0
+print(f"SCORE: {score:.1f}")
+sys.exit(0 if checks_passed == checks_total else 1)

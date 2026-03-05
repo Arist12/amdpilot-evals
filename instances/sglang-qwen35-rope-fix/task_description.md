@@ -1,20 +1,12 @@
-# Fix Qwen3.5 Startup Failures on ROCm
+# Qwen3.5 Fails to Start on ROCm
 
-## Symptom
+Serving Qwen 3.5 MoE on AMD ROCm fails at startup with two separate errors:
 
-Two separate startup failures when serving Qwen 3.5 MoE on AMD ROCm:
+1. `ValueError: Unknown RoPE scaling type` -- appears during model config initialization
 
-### Bug 1: RoPE config parsing failure
-Some Qwen3.5 checkpoints provide RoPE settings in `text_config.rope_parameters`. The current `Qwen3_5MoeTextConfig.__init__` loses these values, causing:
-```
-ValueError: Unknown RoPE scaling type
-```
+2. `ModuleNotFoundError: No module named 'cuda'` -- appears during attention backend import
 
-### Bug 2: CuTe-DSL import failure on ROCm
-`hybrid_linear_attn_backend.py` unconditionally imports CuTe DSL kernel code which depends on `cuda.bindings` (CUDA-specific, unavailable on ROCm):
-```
-ModuleNotFoundError: No module named 'cuda'
-```
+Both errors prevent Qwen3.5 from running on AMD GPUs.
 
 ## Affected Files
 
@@ -23,9 +15,8 @@ ModuleNotFoundError: No module named 'cuda'
 
 ## Environment
 
-- Repository: sgl-project/sglang
-- Docker container with ROCm, PyTorch, AMD GPU
-- Use `/opt/venv/bin/python3` for all commands
+- SGLang at `/workspace/sglang`
+- Use `/opt/venv/bin/python3`
 
 ## Verification
 

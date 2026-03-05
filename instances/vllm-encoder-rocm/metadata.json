@@ -1,25 +1,14 @@
 {
   "name": "vllm-encoder-rocm",
-  "category": "fix",
-  "difficulty": "medium-hard",
+  "category": "bugfix",
+  "difficulty": "hard",
   "source": {
     "repo": "vllm-project/vllm",
     "pr": 35334,
-    "merge_commit": "9fa6c68fa627c7ab041c48ac9987fb093719597f"
+    "parent_commit": "2ce6f3cf67934ebe199188c9a1f83ff1c2d8ba96"
   },
-  "description": "[ROCm] Enabling encoder and encoder-decoder on ROCm and AITER unified backends",
-  "expected_loc_changed": 106,
-  "expected_files_changed": 3,
-  "affected_files": [
-    "docs/design/attention_backends.md",
-    "vllm/v1/attention/backends/rocm_aiter_unified_attn.py",
-    "vllm/v1/attention/backends/rocm_attn.py"
-  ],
-  "requires_gpu": true,
-  "requires_model_download": false,
-  "tags": [
-    "rocm",
-    "fix",
-    "vllm-project"
-  ]
+  "description": "ROCm attention backends raise NotImplementedError for encoder self-attention",
+  "task_description_source": "GitHub PR #35334 (symptom only, no fix)",
+  "test_harness_type": "runtime",
+  "requires_gpu": true
 }

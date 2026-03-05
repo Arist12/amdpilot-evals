@@ -1,28 +1,16 @@
 #!/usr/bin/env python3
-"""Test harness for sglang-rotary-crash eval.
+"""Test harness for sglang-rotary-crash.
 
-Bug: PR #17934 changed HIP rotary embedding fallback to use tvm_ffi JIT that
-requires nvidia-smi/CUDA_HOME, breaking ALL models on ROCm.
-Fix: Add forward_hip() override routing to forward_native() (pure PyTorch).
-
-Tests:
-1. RotaryEmbedding can be instantiated on ROCm
-2. forward() does not crash with tvm_ffi / CUDA_HOME errors
-3. Output is a valid tensor with correct shape
+Verifies RotaryEmbedding works on ROCm without requiring CUDA_HOME.
+All checks are RUNTIME -- no static string matching.
 
 Exit 0 = PASS, Exit 1 = FAIL.
-Output: SCORE: <0-100>
 """
-
 import sys
-from pathlib import Path
-
-SGLANG_ROOT = Path("/workspace/sglang")
-sys.path.insert(0, str(SGLANG_ROOT / "python"))
+sys.path.insert(0, "/workspace/sglang/python")
 
 checks_passed = 0
 checks_total = 0
-
 
 def check(name, condition, detail=""):
     global checks_passed, checks_total
@@ -36,83 +24,71 @@ def check(name, condition, detail=""):
     print(msg)
     return condition
 
+print("=" * 60)
+print("sglang-rotary-crash test harness")
+print("=" * 60)
 
-def run_checks():
-    print("=" * 60)
-    print("sglang-rotary-crash test harness")
-    print("=" * 60)
-
-    # Check 1: The file exists
-    target = SGLANG_ROOT / "python/sglang/srt/layers/rotary_embedding.py"
-    if not check("rotary_embedding.py exists", target.is_file()):
-        return
-
-    # Check 2: File parses
-    source = target.read_text()
-    try:
-        compile(source, str(target), "exec")
-        check("File parses as valid Python", True)
-    except SyntaxError as e:
-        check("File parses as valid Python", False, str(e))
-        return
-
-    # Check 3: Can import torch on ROCm
-    try:
-        import torch
-        is_hip = hasattr(torch.version, "hip") and torch.version.hip is not None
-        check("torch available (HIP detected)" if is_hip else "torch available (no HIP)", True)
-    except ImportError:
-        check("torch available", False)
-        return
-
-    if not torch.cuda.is_available():
-        check("GPU available", False, "No GPU — skipping runtime checks")
-        # Static checks only; at least verify the forward_hip pattern
-        has_forward_hip = "forward_hip" in source or "forward_native" in source
-        check("Has HIP-compatible forward path", has_forward_hip,
-              "Expected forward_hip() or forward_native() bypass for tvm_ffi")
-        return
-
-    check("GPU available", True)
-
-    # Check 4: Import RotaryEmbedding without crash
-    try:
-        from sglang.srt.layers.rotary_embedding import RotaryEmbedding
-        check("RotaryEmbedding importable", True)
-    except Exception as e:
-        err = str(e)
-        if "tvm_ffi" in err or "nvidia-smi" in err or "CUDA_HOME" in err or "cuda" in err.lower():
-            check("RotaryEmbedding importable", False,
-                  f"NVIDIA/CUDA dependency on ROCm: {err}")
-        else:
-            check("RotaryEmbedding importable", False, err)
-        return
-
-    # Check 5: HIP forward path exists in the class
-    # The bug: on HIP, forward() dispatches to a tvm_ffi JIT path that needs NVIDIA tools
-    # The fix: add forward_hip() that routes to forward_native() (pure PyTorch)
-    has_hip_path = hasattr(RotaryEmbedding, 'forward_hip')
-    check("RotaryEmbedding has forward_hip() method", has_hip_path,
-          "Missing forward_hip() — HIP will fall through to NVIDIA JIT path")
-
-    # Check 6: The forward_hip routes to forward_native (not tvm_ffi)
-    if has_hip_path:
-        import inspect
-        hip_source = inspect.getsource(RotaryEmbedding.forward_hip)
-        uses_native = "forward_native" in hip_source
-        check("forward_hip() routes to forward_native()", uses_native,
-              "forward_hip() should call self.forward_native() for pure PyTorch path")
+# Check 1: Import RotaryEmbedding without CUDA_HOME crash
+try:
+    from sglang.srt.layers.rotary_embedding import RotaryEmbedding
+    check("Import RotaryEmbedding", True)
+except RuntimeError as e:
+    if "CUDA" in str(e) or "cuda" in str(e):
+        check("Import RotaryEmbedding", False,
+              f"CUDA dependency on ROCm: {e}")
     else:
-        # Alternative: check if there's a try/except around the JIT path
-        has_jit_guard = "tvm_ffi" not in source or "try" in source
-        check("JIT path has fallback for non-NVIDIA", has_jit_guard,
-              "tvm_ffi JIT path has no fallback for HIP")
+        check("Import RotaryEmbedding", False, str(e))
+except Exception as e:
+    check("Import RotaryEmbedding", False, str(e))
 
+# Check 2: Instantiate RotaryEmbedding
+try:
+    import torch
+    rope = RotaryEmbedding(
+        head_size=128, rotary_dim=128,
+        max_position_embeddings=4096, base=10000,
+        is_neox_style=True, dtype=torch.bfloat16,
+    )
+    check("Instantiate RotaryEmbedding", True)
+except RuntimeError as e:
+    if "CUDA" in str(e):
+        check("Instantiate RotaryEmbedding", False, f"CUDA error: {e}")
+    else:
+        check("Instantiate RotaryEmbedding", False, str(e))
+except Exception as e:
+    check("Instantiate RotaryEmbedding", False, str(e))
 
-if __name__ == "__main__":
-    run_checks()
-    print()
-    score = (checks_passed / checks_total * 100.0) if checks_total > 0 else 0.0
-    print(f"Results: {checks_passed}/{checks_total} checks passed")
-    print(f"SCORE: {score:.1f}")
-    sys.exit(0 if checks_passed == checks_total else 1)
+# Check 3: Call the forward path that is dispatched on HIP
+# This is the critical check -- on unfixed code, this triggers
+# the tvm_ffi / CUDA_HOME error path
+try:
+    is_hip = hasattr(torch.version, "hip") and torch.version.hip is not None
+    if is_hip and torch.cuda.is_available():
+        device = torch.device("cuda:0")
+        seq_len, num_heads, head_dim = 32, 8, 128
+        positions = torch.arange(seq_len, device=device).unsqueeze(0)
+        q = torch.randn(seq_len, num_heads * head_dim, device=device, dtype=torch.bfloat16)
+        k = torch.randn(seq_len, num_heads * head_dim, device=device, dtype=torch.bfloat16)
+
+        # This calls the dispatch chain that broke on ROCm
+        q_out, k_out = rope(positions, q, k)
+
+        has_nan = torch.isnan(q_out).any().item() or torch.isnan(k_out).any().item()
+        check("Forward pass on HIP (no CUDA_HOME crash)", not has_nan,
+              "Output contains NaN" if has_nan else "")
+    else:
+        check("Forward pass on HIP", False, "Not running on HIP or no GPU")
+except RuntimeError as e:
+    err = str(e)
+    if "CUDA" in err or "tvm" in err or "nvidia" in err.lower():
+        check("Forward pass on HIP", False, f"CUDA/TVM dependency: {err}")
+    else:
+        check("Forward pass on HIP", False, err)
+except Exception as e:
+    check("Forward pass on HIP", False, str(e))
+
+print()
+score = (checks_passed / checks_total * 100.0) if checks_total > 0 else 0.0
+print(f"Results: {checks_passed}/{checks_total} checks passed")
+print(f"SCORE: {score:.1f}")
+sys.exit(0 if checks_passed == checks_total else 1)

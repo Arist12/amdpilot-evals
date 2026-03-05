@@ -5,20 +5,11 @@
   "source": {
     "repo": "sgl-project/sglang",
     "pr": 18753,
-    "merge_commit": "944a9f6fcfe6a56f682da9e0644abf569cb4ca2c"
+    "merge_commit": "944a9f6fcfe6a56f682da9e0644abf569cb4ca2c",
+    "parent_commit": "91230dcca890252018e04f838db7f19995a62aa1"
   },
-  "description": "[AMD] Fix/qwen3 5 amd rope cutedsl fallback",
-  "expected_loc_changed": 24,
-  "expected_files_changed": 2,
-  "affected_files": [
-    "python/sglang/srt/configs/qwen3_5.py",
-    "python/sglang/srt/layers/attention/hybrid_linear_attn_backend.py"
-  ],
-  "requires_gpu": true,
-  "requires_model_download": false,
-  "tags": [
-    "rocm",
-    "bugfix",
-    "sgl-project"
-  ]
+  "description": "Qwen3.5 fails to start on ROCm with two separate errors",
+  "task_description_source": "Symptom only (error messages), no fix hints",
+  "test_harness_type": "runtime (import + config construction + module loading)",
+  "requires_gpu": false
 }
