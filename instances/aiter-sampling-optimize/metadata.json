@@ -1,0 +1,15 @@
+{
+  "name": "aiter-sampling-optimize",
+  "category": "optimize",
+  "difficulty": "hard",
+  "source": {
+    "repo": "ROCm/aiter",
+    "pr": 2034,
+    "merge_commit": "bfa86a0b25652b9b0da5c3e3692136789dc4f984",
+    "parent_commit": "7411c99753f0661a3eecdbdb1b36feb58539f62b"
+  },
+  "description": "Optimize TopK/TopP sampling kernel to reduce latency by 30%+",
+  "task_description_source": "Symptom only (kernel is slow), no optimization technique revealed",
+  "test_harness_type": "runtime (correctness + latency benchmark on GPU)",
+  "requires_gpu": true
+}

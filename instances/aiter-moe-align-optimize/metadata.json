@@ -1,0 +1,15 @@
+{
+  "name": "aiter-moe-align-optimize",
+  "category": "optimize",
+  "difficulty": "hard",
+  "source": {
+    "repo": "ROCm/aiter",
+    "pr": 1869,
+    "merge_commit": "62653348a47ff76c01a1058a08bb191d5fba5b3d",
+    "parent_commit": "2d76e1812385b7688f938120ea86f8a70778dfdb"
+  },
+  "description": "Optimize moe_align_block_size kernel shared memory usage and performance",
+  "task_description_source": "Symptom only (kernel is slow, excessive shared memory), no algorithm revealed",
+  "test_harness_type": "runtime (correctness + latency benchmark on GPU)",
+  "requires_gpu": true
+}
