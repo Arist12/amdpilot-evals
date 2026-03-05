@@ -1,0 +1,25 @@
+{
+  "name": "sglang-deepseek-r1-optimize",
+  "category": "bugfix",
+  "difficulty": "medium",
+  "source": {
+    "repo": "sgl-project/sglang",
+    "pr": 18242,
+    "merge_commit": "b9cf1563de979458e5c831ccfe8f5bfd47a55d01"
+  },
+  "description": "[ROCm] Optimize Deepseek R1 on MI300X",
+  "expected_loc_changed": 7,
+  "expected_files_changed": 3,
+  "affected_files": [
+    "python/sglang/srt/layers/attention/aiter_backend.py",
+    "python/sglang/srt/layers/quantization/fp8_utils.py",
+    "python/sglang/srt/models/deepseek_v2.py"
+  ],
+  "requires_gpu": true,
+  "requires_model_download": false,
+  "tags": [
+    "rocm",
+    "bugfix",
+    "sgl-project"
+  ]
+}

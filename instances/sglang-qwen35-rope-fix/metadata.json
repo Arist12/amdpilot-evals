@@ -1,0 +1,24 @@
+{
+  "name": "sglang-qwen35-rope-fix",
+  "category": "bugfix",
+  "difficulty": "medium",
+  "source": {
+    "repo": "sgl-project/sglang",
+    "pr": 18753,
+    "merge_commit": "944a9f6fcfe6a56f682da9e0644abf569cb4ca2c"
+  },
+  "description": "[AMD] Fix/qwen3 5 amd rope cutedsl fallback",
+  "expected_loc_changed": 24,
+  "expected_files_changed": 2,
+  "affected_files": [
+    "python/sglang/srt/configs/qwen3_5.py",
+    "python/sglang/srt/layers/attention/hybrid_linear_attn_backend.py"
+  ],
+  "requires_gpu": true,
+  "requires_model_download": false,
+  "tags": [
+    "rocm",
+    "bugfix",
+    "sgl-project"
+  ]
+}
