@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Test harness for sglang-rotary-crash.
+"""Test harness for sglang-rotary-crash. ALL RUNTIME CHECKS.
 
-Verifies RotaryEmbedding works on ROCm without requiring CUDA_HOME.
-All checks are RUNTIME -- no static string matching.
-
-Exit 0 = PASS, Exit 1 = FAIL.
+Bug: RotaryEmbedding forward() on HIP tries to JIT-compile CUDA code,
+crashing with CUDA_HOME / hipcc errors.
 """
 import sys
 sys.path.insert(0, "/workspace/sglang/python")
@@ -28,67 +26,61 @@ print("=" * 60)
 print("sglang-rotary-crash test harness")
 print("=" * 60)
 
-# Check 1: Import RotaryEmbedding without CUDA_HOME crash
+# Mock server args (needed to instantiate RotaryEmbedding)
+try:
+    from sglang.srt.server_args import ServerArgs
+    import sglang.srt.server_args as sa
+    sa._global_server_args = ServerArgs(model_path="dummy")
+except Exception as e:
+    print(f"Warning: Could not mock server args: {e}")
+
+# Check 1: Import
 try:
     from sglang.srt.layers.rotary_embedding import RotaryEmbedding
     check("Import RotaryEmbedding", True)
-except RuntimeError as e:
-    if "CUDA" in str(e) or "cuda" in str(e):
-        check("Import RotaryEmbedding", False,
-              f"CUDA dependency on ROCm: {e}")
-    else:
-        check("Import RotaryEmbedding", False, str(e))
 except Exception as e:
     check("Import RotaryEmbedding", False, str(e))
+    print(f"\nSCORE: 0.0")
+    sys.exit(1)
 
-# Check 2: Instantiate RotaryEmbedding
+# Check 2: Instantiate
 try:
     import torch
-    rope = RotaryEmbedding(
-        head_size=128, rotary_dim=128,
-        max_position_embeddings=4096, base=10000,
-        is_neox_style=True, dtype=torch.bfloat16,
-    )
+    rope = RotaryEmbedding(128, 128, 4096, 10000, True, torch.bfloat16)
     check("Instantiate RotaryEmbedding", True)
-except RuntimeError as e:
-    if "CUDA" in str(e):
-        check("Instantiate RotaryEmbedding", False, f"CUDA error: {e}")
-    else:
-        check("Instantiate RotaryEmbedding", False, str(e))
 except Exception as e:
     check("Instantiate RotaryEmbedding", False, str(e))
+    print(f"\nSCORE: 0.0")
+    sys.exit(1)
 
-# Check 3: Call the forward path that is dispatched on HIP
-# This is the critical check -- on unfixed code, this triggers
-# the tvm_ffi / CUDA_HOME error path
-try:
-    is_hip = hasattr(torch.version, "hip") and torch.version.hip is not None
-    if is_hip and torch.cuda.is_available():
+# Check 3: Forward pass on HIP -- this is where the bug manifests
+is_hip = hasattr(torch.version, "hip") and torch.version.hip is not None
+if is_hip and torch.cuda.is_available():
+    try:
         device = torch.device("cuda:0")
-        seq_len, num_heads, head_dim = 32, 8, 128
-        positions = torch.arange(seq_len, device=device).unsqueeze(0)
-        q = torch.randn(seq_len, num_heads * head_dim, device=device, dtype=torch.bfloat16)
-        k = torch.randn(seq_len, num_heads * head_dim, device=device, dtype=torch.bfloat16)
+        positions = torch.arange(32, device=device).unsqueeze(0)
+        q = torch.randn(32, 8 * 128, device=device, dtype=torch.bfloat16)
+        k = torch.randn(32, 8 * 128, device=device, dtype=torch.bfloat16)
 
-        # This calls the dispatch chain that broke on ROCm
         q_out, k_out = rope(positions, q, k)
 
         has_nan = torch.isnan(q_out).any().item() or torch.isnan(k_out).any().item()
-        check("Forward pass on HIP (no CUDA_HOME crash)", not has_nan,
+        check("Forward pass on HIP (no CUDA JIT crash)", not has_nan,
               "Output contains NaN" if has_nan else "")
-    else:
-        check("Forward pass on HIP", False, "Not running on HIP or no GPU")
-except RuntimeError as e:
-    err = str(e)
-    if "CUDA" in err or "tvm" in err or "nvidia" in err.lower():
-        check("Forward pass on HIP", False, f"CUDA/TVM dependency: {err}")
-    else:
-        check("Forward pass on HIP", False, err)
-except Exception as e:
-    check("Forward pass on HIP", False, str(e))
+    except RuntimeError as e:
+        err = str(e)
+        if "ninja" in err or "CUDA" in err or "hipcc" in err or "expt-relaxed" in err:
+            check("Forward pass on HIP (no CUDA JIT crash)", False,
+                  f"JIT compilation failure: {err[:200]}")
+        else:
+            check("Forward pass on HIP", False, err[:200])
+    except Exception as e:
+        check("Forward pass on HIP", False, str(e)[:200])
+else:
+    check("Forward pass on HIP", False, "No HIP GPU available")
 
 print()
 score = (checks_passed / checks_total * 100.0) if checks_total > 0 else 0.0
-print(f"Results: {checks_passed}/{checks_total} checks passed")
+print(f"Results: {checks_passed}/{checks_total}")
 print(f"SCORE: {score:.1f}")
 sys.exit(0 if checks_passed == checks_total else 1)
