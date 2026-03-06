@@ -125,7 +125,9 @@ def build_dockerfile(repo: str, base_image: str) -> str:
 
 
 def build_yaml(name: str, repo: str, task_type: str, base_image: str,
-               task_desc_path: str, hours: int) -> str:
+               task_desc_path: str, hours: int,
+               model_url: str = "") -> str:
+    url = model_url or os.environ.get("AMDPILOT_MODEL_URL", "http://localhost:30000/v1")
     return textwrap.dedent(f"""\
         name: {name}
         type: {task_type}
@@ -134,7 +136,7 @@ def build_yaml(name: str, repo: str, task_type: str, base_image: str,
 
         model_endpoint:
           model: "qwen-3.5"
-          base_url: "http://10.235.24.154:30000/v1"
+          base_url: "{url}"
           api_key: "sk-dummy"
 
         container:
@@ -175,6 +177,9 @@ def main():
     parser = argparse.ArgumentParser(description="Resolve a GitHub issue autonomously")
     parser.add_argument("issue", help="Issue URL or owner/repo/issues/NUMBER")
     parser.add_argument("--hours", type=int, default=2, help="Max runtime hours")
+    parser.add_argument("--model-url",
+                        default=os.environ.get("AMDPILOT_MODEL_URL", ""),
+                        help="LLM endpoint URL (or set AMDPILOT_MODEL_URL)")
     parser.add_argument("--results-dir", default=None, help="Results directory")
     parser.add_argument("--dry-run", action="store_true", help="Generate config only")
     args = parser.parse_args()
@@ -207,7 +212,8 @@ def main():
     dockerfile_path.write_text(dockerfile)
 
     yaml_content = build_yaml(name, repo, task_type, base_image,
-                               str(task_desc_path), args.hours)
+                               str(task_desc_path), args.hours,
+                               model_url=args.model_url)
     yaml_path = work_dir / "task.yaml"
     yaml_path.write_text(yaml_content)
 

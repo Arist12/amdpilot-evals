@@ -1,7 +1,7 @@
-name: aiter-sampling-optimize
+name: aiter-mla-reduce-optimize
 type: optimize
 repo: https://github.com/ROCm/aiter.git
-base_image: amdpilot-eval-aiter-sampling-optimize
+base_image: amdpilot-eval-aiter-mla-reduce-optimize
 
 model_endpoint:
   model: "qwen-3.5"
@@ -9,13 +9,13 @@ model_endpoint:
   api_key: "sk-dummy"
 
 container:
-  name: amdpilot_eval_sampling
+  name: amdpilot_eval_mla_reduce
   gpu: "0"
   shm_size: 16g
   devices: [/dev/kfd, /dev/dri]
 
 workload:
-  description: "Optimize the TopK/TopP sampling kernel in AITER to reduce latency"
+  description: "Optimize MLA reduce kernel to reduce attention decode latency"
   framework: PyTorch
 
 benchmark:
@@ -25,7 +25,7 @@ benchmark:
   metric_direction: higher
 
 task:
-  description_file: evals/instances/aiter-sampling-optimize/task_description.md
+  description_file: evals/instances/aiter-mla-reduce-optimize/task_description.md
 
 stages: auto
 

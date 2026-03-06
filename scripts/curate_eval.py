@@ -30,7 +30,7 @@ import sys
 import textwrap
 from pathlib import Path
 
-EVALS_DIR = Path(__file__).resolve().parent.parent / "evals" / "instances"
+EVALS_DIR = Path(__file__).resolve().parent.parent / "instances"
 
 BASE_IMAGES = {
     "sgl-project/sglang": "rocm/sgl-dev:v0.5.9-rocm720-mi35x-20260226",
@@ -185,7 +185,9 @@ def generate_dockerfile(repo: str, merge_commit: str | None, base_image: str) ->
 
 
 def generate_task_yaml(name: str, repo: str, task_type: str,
-                       base_image: str) -> str:
+                       base_image: str,
+                       model_url: str = "") -> str:
+    url = model_url or os.environ.get("AMDPILOT_MODEL_URL", "http://localhost:30000/v1")
     return textwrap.dedent(f"""\
         name: {name}
         type: {task_type}
@@ -194,7 +196,7 @@ def generate_task_yaml(name: str, repo: str, task_type: str,
 
         model_endpoint:
           model: "qwen-3.5"
-          base_url: "http://10.235.24.154:30000/v1"
+          base_url: "{url}"
           api_key: "sk-dummy"
 
         container:
@@ -309,8 +311,9 @@ def main():
     parser.add_argument("--name", help="Instance name (auto-generated if omitted)")
     parser.add_argument("--generate-test", action="store_true",
                         help="Use LLM to generate test_harness.py (requires model endpoint)")
-    parser.add_argument("--model-url", default="http://10.235.24.154:30000/v1",
-                        help="LLM endpoint for test generation")
+    parser.add_argument("--model-url",
+                        default=os.environ.get("AMDPILOT_MODEL_URL", "http://localhost:30000/v1"),
+                        help="LLM endpoint for test generation (or set AMDPILOT_MODEL_URL)")
     parser.add_argument("--output-dir", help="Override output directory")
     args = parser.parse_args()
 

@@ -1,0 +1,15 @@
+{
+  "name": "aiter-sigmoid-fastmath",
+  "category": "optimize",
+  "difficulty": "hard",
+  "source": {
+    "repo": "ROCm/aiter",
+    "pr": 1879,
+    "merge_commit": "daa23b1f9246c766458723c80a772c7597a4f534",
+    "parent_commit": "cbf2df77632d4f3389178b6528d40af9f34be7e6"
+  },
+  "description": "Optimize sigmoid activation kernel using AMD fast math intrinsics for 20% speedup",
+  "task_description_source": "Symptom only (sigmoid kernel is slow), optimization approach not revealed",
+  "test_harness_type": "runtime (correctness + latency benchmark on GPU)",
+  "requires_gpu": true
+}

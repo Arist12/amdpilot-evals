@@ -5,7 +5,7 @@ base_image: amdpilot-eval-vllm-ck-mxfp4-moe
 
 model_endpoint:
   model: "qwen-3.5"
-  base_url: "http://10.235.24.154:30000/v1"
+  base_url: "http://localhost:30000/v1"
   api_key: "sk-dummy"
 
 container:

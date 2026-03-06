@@ -1,7 +1,7 @@
-name: aiter-sampling-optimize
+name: aiter-sigmoid-fastmath
 type: optimize
 repo: https://github.com/ROCm/aiter.git
-base_image: amdpilot-eval-aiter-sampling-optimize
+base_image: amdpilot-eval-aiter-sigmoid-fastmath
 
 model_endpoint:
   model: "qwen-3.5"
@@ -9,13 +9,13 @@ model_endpoint:
   api_key: "sk-dummy"
 
 container:
-  name: amdpilot_eval_sampling
+  name: amdpilot_eval_sigmoid
   gpu: "0"
   shm_size: 16g
   devices: [/dev/kfd, /dev/dri]
 
 workload:
-  description: "Optimize the TopK/TopP sampling kernel in AITER to reduce latency"
+  description: "Optimize sigmoid activation kernel using AMD hardware intrinsics"
   framework: PyTorch
 
 benchmark:
@@ -25,7 +25,7 @@ benchmark:
   metric_direction: higher
 
 task:
-  description_file: evals/instances/aiter-sampling-optimize/task_description.md
+  description_file: evals/instances/aiter-sigmoid-fastmath/task_description.md
 
 stages: auto
 
