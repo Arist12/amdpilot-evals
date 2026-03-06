@@ -35,6 +35,7 @@ from shared.registry_tools import (  # noqa: E402
     fetch_pr_diff,
     gh_api_json,
     key_files_to_list,
+    manifest_path,
     normalize_test_commands,
     pr_slug,
     read_json_source,
@@ -117,7 +118,7 @@ def main() -> int:
             diff_text = fetch_pr_diff(repo, pr_number)
             diff_path = args.diff_dir / f"{pr_slug(repo)}__pr{pr_number}.diff"
             diff_path.write_text(diff_text, encoding="utf-8")
-            diff_path_text = str(diff_path.relative_to(PROJECT_ROOT))
+            diff_path_text = manifest_path(diff_path, PROJECT_ROOT)
             if args.apply_check:
                 apply_ok, apply_message = verify_apply_check(
                     repo=repo,

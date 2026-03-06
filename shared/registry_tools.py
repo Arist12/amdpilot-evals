@@ -208,3 +208,15 @@ def verify_apply_check(
             if proc.returncode != 0:
                 return False, f"{' '.join(cmd)}\n{proc.stderr.strip()}"
         return True, "ok"
+
+
+def manifest_path(path: Path, project_root: Path) -> str:
+    """Return a stable path string for JSON outputs.
+
+    Prefer a project-relative path when possible so committed registries remain
+    portable. If *path* is outside the repo, fall back to an absolute path.
+    """
+    try:
+        return str(path.relative_to(project_root))
+    except ValueError:
+        return str(path)

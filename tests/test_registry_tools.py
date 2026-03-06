@@ -9,6 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from shared.registry_tools import (
     classify_gpu_required,
     key_files_to_list,
+    manifest_path,
     normalize_test_commands,
     parse_pr_ref,
     pr_slug,
@@ -55,6 +56,17 @@ class RegistryToolsTests(unittest.TestCase):
 
     def test_pr_slug_preserves_case_but_sanitizes(self) -> None:
         self.assertEqual(pr_slug("sgl-project/sglang"), "sgl-project_sglang")
+
+    def test_manifest_path_prefers_repo_relative_paths(self) -> None:
+        project_root = Path("/repo")
+        self.assertEqual(
+            manifest_path(Path("/repo/diffs/x.diff"), project_root),
+            "diffs/x.diff",
+        )
+        self.assertEqual(
+            manifest_path(Path("/tmp/diffs/x.diff"), project_root),
+            "/tmp/diffs/x.diff",
+        )
 
 
 if __name__ == "__main__":
