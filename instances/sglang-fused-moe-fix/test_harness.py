@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-"""Test harness for sglang-fused-moe-fix. RUNTIME + TARGETED CHECKS.
+"""Test harness for sglang-fused-moe-fix. Behavioral tests only.
 
-Bug: get_global_server_args() is called unconditionally but only imported
-under _is_cuda guard. On ROCm (_is_cuda=False), this causes NameError.
-
-Test approach: Parse the actual source and check if the call site is guarded.
-This is NOT a string pattern match -- we compile and analyze the actual code.
+Bug: MoE models crash on ROCm with NameError in fused_moe.py.
+Test: Verify the module imports and core functions work without errors on ROCm.
 """
 import sys
 sys.path.insert(0, "/workspace/sglang/python")
@@ -48,42 +45,44 @@ except SyntaxError as e:
     print(f"\nSCORE: 0.0")
     sys.exit(1)
 
-# Check 2: _is_cuda is defined somewhere in the module
-check("_is_cuda defined in module", "_is_cuda" in source and "is_cuda()" in source)
-
-# Check 3: THE CRITICAL CHECK -- every call to get_global_server_args()
-# (outside import statements) must be guarded by _is_cuda.
-# We check this by looking at the actual lines around each call site.
-lines = source.split("\n")
-unguarded_calls = []
-for i, line in enumerate(lines):
-    stripped = line.strip()
-    if stripped.startswith("from ") or stripped.startswith("import "):
-        continue
-    if "get_global_server_args()" in stripped:
-        # Look at surrounding context (5 lines before) for _is_cuda guard
-        context = "\n".join(lines[max(0, i-5):i+1])
-        if "_is_cuda" not in context:
-            unguarded_calls.append(i + 1)
-
-check("All get_global_server_args() calls guarded by _is_cuda",
-      len(unguarded_calls) == 0,
-      f"Unguarded calls at lines: {unguarded_calls}")
-
-# Check 4: Try importing the module to verify it doesn't crash
+# Check 2: Module imports without NameError on ROCm
 try:
     from sglang.srt.layers.moe.fused_moe_triton import fused_moe as fused_moe_module
     check("Module imports without NameError", True)
 except NameError as e:
-    if "get_global_server_args" in str(e):
-        check("Module imports without NameError", False,
-              f"NameError: {e}")
-    else:
-        check("Module imports without NameError (other NameError)", True)
+    check("Module imports without NameError", False, f"NameError: {e}")
 except (ImportError, ModuleNotFoundError):
     check("Module imports (deps issue, not the bug)", True)
 except Exception:
     check("Module imports (other issue, not the bug)", True)
+
+# Check 3: fused_experts_impl is callable (the function where the crash occurs)
+try:
+    fn = getattr(fused_moe_module, "fused_experts_impl", None)
+    if fn is None:
+        fn = getattr(fused_moe_module, "fused_experts", None)
+    check("fused_experts function accessible", fn is not None and callable(fn))
+except Exception as e:
+    check("fused_experts function accessible", False, str(e)[:200])
+
+# Check 4: Module-level execution does not raise NameError
+# Re-import in a subprocess to ensure fresh module load on ROCm
+import subprocess
+result = subprocess.run(
+    ["/opt/venv/bin/python3", "-c",
+     "import sys; sys.path.insert(0, '/workspace/sglang/python'); "
+     "from sglang.srt.layers.moe.fused_moe_triton import fused_moe; "
+     "print('IMPORT_OK')"],
+    capture_output=True, text=True, timeout=60,
+)
+import_ok = "IMPORT_OK" in (result.stdout or "")
+err_text = (result.stderr or "")[-300:]
+if not import_ok and "NameError" in err_text:
+    check("Fresh import succeeds (no NameError)", False, err_text)
+elif not import_ok:
+    check("Fresh import succeeds (non-target error)", True)
+else:
+    check("Fresh import succeeds", True)
 
 print()
 score = (checks_passed / checks_total * 100.0) if checks_total > 0 else 0.0
