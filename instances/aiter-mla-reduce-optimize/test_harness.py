@@ -163,9 +163,9 @@ print(f'MLA_PERSISTENT_DECODE_US: {us:.1f}')
         match = re.search(r'MLA_PERSISTENT_DECODE_US:\s+([\d.]+)', result.stdout)
         if match:
             latency_us = float(match.group(1))
-            # Unoptimized baseline: ~18us for persistent-mode decode (batch=64, ctx=4000)
-            # Optimized target: ~13us (reduce kernel improvement from 18.2us to <13us)
-            threshold_us = 16.0
+            # Unoptimized baseline: ~28us for persistent-mode decode (batch=64, ctx=4000)
+            # Optimized reduce kernel saves ~5us (18.2us -> 13us), giving ~23us total
+            threshold_us = 25.0
             print(f"  Persistent MLA decode latency: {latency_us:.1f}us (threshold: <{threshold_us}us)")
             check(f"MLA decode latency < {threshold_us}us (got {latency_us:.1f}us)", latency_us < threshold_us,
                   f"Reduce kernel too slow ({latency_us:.1f}us), optimization likely not applied")
