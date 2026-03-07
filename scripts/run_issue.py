@@ -29,11 +29,17 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 
-BASE_IMAGES = {
-    "sgl-project/sglang": "rocm/sgl-dev:v0.5.9-rocm720-mi35x-20260226",
-    "ROCm/aiter": "rocm/sgl-dev:v0.5.9-rocm720-mi35x-20260226",
-    "vllm-project/vllm": "rocm/sgl-dev:v0.5.9-rocm720-mi35x-20260226",
-}
+# Add the project source to the path so we can use platform detection
+sys.path.insert(0, str(PROJECT_ROOT.parent / "src"))
+
+
+def _get_base_image() -> str:
+    """Auto-detect the appropriate base image for the current platform."""
+    try:
+        from amdpilot.orchestrator.platform import resolve_base_image
+        return resolve_base_image()
+    except ImportError:
+        return "rocm/sgl-dev:v0.5.9-rocm720-mi35x-20260306"
 
 WORKSPACE_MAP = {
     "sgl-project/sglang": "/workspace/sglang",
@@ -196,7 +202,7 @@ def main():
     print(f"  Type:  {task_type}")
     print(f"  Name:  {name}")
 
-    base_image = BASE_IMAGES.get(repo, BASE_IMAGES["sgl-project/sglang"])
+    base_image = _get_base_image()
 
     # Create workspace
     work_dir = Path(args.results_dir or f"results/{name}")
