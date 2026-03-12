@@ -1,0 +1,104 @@
+name: vllm-skinny-gemm-pad
+type: optimize
+repo: https://github.com/vllm-project/vllm.git
+base_image: amdpilot-eval-vllm-skinny-gemm-pad
+
+model_endpoint:
+  model: "Qwen3.5-397B-A17B"
+  base_url: "http://10.235.27.218:30000/v1"
+  api_key: "sk-dummy"
+
+supervisor_model_endpoint:
+  model: "claude-opus-4-6"
+  base_url: "http://localhost:8083/v1"
+  api_key: "not-needed"
+
+container:
+  name: amdpilot_eval_vllm_skinny_gemm_pad
+  gpu: "0"
+  shm_size: 16g
+  devices: [/dev/kfd, /dev/dri]
+
+workload:
+  description: "wvSplitK skinny GEMM kernel lacks padding support for non-contiguous tensors"
+  framework: PyTorch
+
+benchmark:
+  command: "cd /workspace/vllm && python /workspace/test_harness.py"
+  metric_name: score
+  metric_pattern: 'SCORE:\s+([\d.]+)'
+  metric_direction: higher
+
+task:
+  description_file: evals/instances/vllm-skinny-gemm-pad/task_description.md
+
+stages:
+  - name: stage1_profile_and_diagnose
+    start_image: amdpilot-eval-vllm-skinny-gemm-pad
+    duration_minutes: 50
+    target: 35
+    description: >
+      FIRST: Read the task description at /workspace/task_description.md.
+      SECOND: Profile the skinny GEMM kernel with rocprof to understand the
+      dispatch flow: run
+      "rocprof --stats python -c \"import torch; import vllm._custom_ops as ops; from vllm.utils.platform_utils import num_compute_units; A=torch.randn(4,4096,dtype=torch.bfloat16,device='cuda'); B=torch.randn(4096,4096,dtype=torch.bfloat16,device='cuda'); [ops.wvSplitK(B,A,num_compute_units()) for _ in range(100)]; torch.cuda.synchronize()\" 2>&1 | tail -40"
+      THEN: Understand why padded tensors bypass the optimized kernel. Read
+      vllm/model_executor/layers/utils.py and find the is_contiguous() guard.
+      Create a padded tensor using F.pad and verify it produces wrong results
+      when passed directly to ops.wvSplitK.
+      Read csrc/rocm/skinny_gemms.cu to understand the kernel's memory access
+      patterns and how K is used for addressing.
+      Run the test harness to establish your baseline score.
+
+  - name: stage2_implement_padding
+    start_image: auto
+    duration_minutes: 50
+    target: 65
+    description: >
+      Implement padding support in the CUDA kernel. The kernel functions in
+      csrc/rocm/skinny_gemms.cu need stride parameters (e.g., Kbp for weight
+      stride, Kap for activation stride) added to their signatures. Then
+      modify all memory access patterns to use these strides instead of K.
+      The dispatch macros that launch the kernels must also be updated to
+      extract strides from the tensor arguments and pass them.
+      After modifying the kernel, rebuild with:
+      cd /workspace/vllm && pip install -e . --no-build-isolation
+      Test with padded tensors to verify correctness improves.
+      IMPORTANT: The C++ rebuild can take several minutes. Be patient and
+      check for compilation errors carefully.
+
+  - name: stage3_edge_cases_and_integration
+    start_image: auto
+    duration_minutes: 50
+    target: 85
+    description: >
+      Fix remaining edge cases: ensure bounds checking is present in the
+      kernel write-back section (the commitColumn pattern prevents out-of-bounds
+      writes when M is not a multiple of YTILE). Fix the bias indexing to use
+      the correct array offset. Verify the LDS usage calculation uses the
+      correct stride variable for kernel selection.
+      Remove the is_contiguous() check from vllm/model_executor/layers/utils.py
+      in the use_skinny condition.
+      Rebuild and run the full test harness. All padding combinations, bias
+      modes, and regression tests should pass.
+      Profile again to confirm the optimized kernel path is used for padded
+      tensors.
+
+nudge_config:
+  poll_interval: 10
+  profiling_check_after_s: 300
+  benchmark_check_after_s: 180
+  kimi_status_interval: 15
+
+kimi_cli:
+  repo_url: "https://github.com/Arist12/kimi-cli.git"
+  branch: amd-dev
+  install_dir: "/sgl-workspace/kimi-cli"
+  provider: "sglang"
+  provider_type: "openai_legacy"
+  thinking: false
+  yolo: true
+  ralph_iterations: -1
+
+max_retries_per_stage: 5
+max_total_hours: 3
