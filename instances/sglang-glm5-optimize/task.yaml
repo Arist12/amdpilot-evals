@@ -1,0 +1,49 @@
+name: sglang-glm5-optimize
+type: optimize
+repo: https://github.com/sgl-project/sglang.git
+repo_branch: main
+base_image: amdpilot-eval-sglang-glm5-optimize
+
+model_endpoint:
+  base_url: "http://10.235.27.218:30000/v1"
+  api_key: "EMPTY"
+
+container:
+  name: amdpilot_glm5
+  gpu: "0,1,2,3,4,5,6,7"
+  shm_size: 64g
+  devices: [/dev/kfd, /dev/dri]
+  env:
+    TOKENIZERS_PARALLELISM: "false"
+    GPU_COREDUMP_ENABLE: "0"
+  volumes:
+    - "/mnt/dcgpuval/huggingface:/root/.cache/huggingface"
+
+workload:
+  description: "Optimize decode latency for GLM-5-FP8 MoE model on AMD MI355X with TP=8"
+  function: "sglang.bench_one_batch decode"
+  framework: PyTorch
+
+benchmark:
+  command: "bash /workspace/bench_glm5.sh"
+  metric_name: decode_median_ms
+  metric_pattern: 'Decode median \(ms\):\s+([\d.]+)'
+  metric_direction: lower
+  fixed_params:
+    model: zai-org/GLM-5-FP8
+    tp: 8
+    batch_size: 1
+    input_len: 1024
+    output_len: 128
+  valid_context_pattern: "tp=8"
+  output_format: "Decode median (ms): <value> | tp=8 batch=1"
+
+task:
+  description_file: evals/instances/sglang-glm5-optimize/task_description.md
+
+stages: auto
+
+max_retries_per_stage: 5
+max_total_hours: 6
+supervisor_mode: agent
+nudge_agent: oss
