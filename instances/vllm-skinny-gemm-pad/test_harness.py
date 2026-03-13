@@ -141,6 +141,46 @@ def test_direct_wvsplitk(n, k, m, dtype, bias_mode, padded_a, padded_b, xnorm=Tr
     return ok, f"max_err={max_err:.6f}"
 
 
+def test_reduce_counting_guard(dtype):
+    """Guardrail: padded tensors should NOT route through wvSplitKrc.
+
+    The human patch did not change the wvSplitKrc / reduce-counting path.
+    We therefore verify that padded tensors still avoid this kernel and get
+    correct results via fallback behavior.
+    """
+    import torch
+    import vllm._custom_ops as ops
+    from vllm.model_executor.layers.utils import rocm_unquantized_gemm_impl
+    from vllm.platforms.rocm import on_gfx950
+
+    if not on_gfx950():
+        return True, "non-gfx950 platform: reduce-counting path inactive"
+
+    torch.manual_seed(42)
+    n, k, m = 13, 2880, 128
+    xavier = math.sqrt(2 / k)
+    A = (torch.rand(n, k, dtype=dtype, device="cuda") * 2 - 1) * xavier
+    B = (torch.rand(m, k, dtype=dtype, device="cuda") * 2 - 1) * xavier
+    A = pad_tensor(A)
+    ref = torch.nn.functional.linear(A, B)
+
+    rc_called = [False]
+    original = ops.wvSplitKrc
+
+    def tracking_wvSplitKrc(*args, **kwargs):
+        rc_called[0] = True
+        return original(*args, **kwargs)
+
+    with patch.object(ops, "wvSplitKrc", side_effect=tracking_wvSplitKrc):
+        out = rocm_unquantized_gemm_impl(A, B, None)
+
+    correct = torch.allclose(out, ref, atol=1e-3, rtol=1e-2)
+    max_err = (out - ref).abs().max().item()
+    return (not rc_called[0]) and correct, (
+        f"wvSplitKrc_called={rc_called[0]}, max_err={max_err:.6f}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tier 0 — Profiling Evidence (15 pts)
 # ---------------------------------------------------------------------------
@@ -321,7 +361,7 @@ def score_tier2():
     ]
 
     total_tests = len(regression_configs)
-    pts_per_test = 20.0 / total_tests
+    pts_per_test = 18.0 / total_tests
     passed = 0
     failed = 0
 
@@ -339,6 +379,19 @@ def score_tier2():
         except Exception as e:
             failed += 1
             print(f"  [FAIL] {label}: {e}")
+
+    try:
+        ok, detail = test_reduce_counting_guard(torch.bfloat16)
+        if ok:
+            pts += 2.0
+            passed += 1
+            print(f"  [PASS] reduce-counting padded guard ({detail})")
+        else:
+            failed += 1
+            print(f"  [FAIL] reduce-counting padded guard: {detail}")
+    except Exception as e:
+        failed += 1
+        print(f"  [FAIL] reduce-counting padded guard: {e}")
 
     print(f"  Tier 2 subtotal: {pts:.1f}/20.0  ({passed} passed, {failed} failed)")
     tier_scores["tier2"] = pts
