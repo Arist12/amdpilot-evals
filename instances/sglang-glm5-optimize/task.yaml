@@ -9,6 +9,9 @@ model_endpoint:
   base_url: "http://10.235.24.154:30000/v1"
   api_key: "EMPTY"
 
+kimi_cli:
+  thinking: true
+
 container:
   name: amdpilot_glm5
   gpu: "0,1,2,3,4,5,6,7"
@@ -27,6 +30,7 @@ workload:
 
 benchmark:
   command: "bash /workspace/bench_glm5.sh"
+  fast_profile_command: "bash /workspace/bench_glm5_fast.sh"
   metric_name: decode_median_ms
   metric_pattern: 'Decode median \(ms\):\s+([\d.]+)'
   metric_direction: lower
